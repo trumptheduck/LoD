@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html>
+<head>
+        <link rel="manifest" href="/views/pwa.webmanifest">
+        <link rel="apple-touch-icon" href="/assets/icon-256x256.png">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff"/>
+        <title>Page Title</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <style>
+        body {
+            margin: 0px;
+            overscroll-behavior: none;
+            overflow: hidden;
+        }
+        #container {
+            width: 100%;
+            height: 100%;
+        }
+        .slider {
+    -webkit-appearance: none;  /* Override default CSS styles */
+    appearance: none;
+    width: 200px; /* Full-width */
+    height: 40px; /* Specified height */
+    border-radius: 10px;
+    background: #d3d3d3; /* Grey background */
+    outline: none; /* Remove outline */
+    opacity: 0.2; /* Set transparency (for mouse-over effects on hover) */
+    -webkit-transition: .2s; /* 0.2 seconds transition on hover */
+    transition: opacity .2s;
+    }
+
+    /* The slider handle (use -webkit- (Chrome, Opera, Safari, Edge) and -moz- (Firefox) to override default look) */
+    .slider::-webkit-slider-thumb {
+    -webkit-appearance: none; /* Override default look */
+    appearance: none;
+    width: 70px; /* Set a specific slider handle width */
+    height: 70px; /* Slider handle height */
+    border-radius: 70px;
+    background: grey; /* Green background */
+    cursor: pointer; /* Cursor on hover */
+    }
+
+    .slider::-moz-range-thumb {
+    width: 70px; /* Set a specific slider handle width */
+    height: 70px; /* Slider handle height */
+    border-radius: 70px;
+    background: grey; /* Green background */
+    cursor: pointer; /* Cursor on hover */
+    }
+    </style>
+</head>
+<body>
+    <div id="ui-layer" style="position: absolute; width: 100%; height: 100%;">
+    </div>
+    <div id="container">
+        <button style="position: absolute; display: none;">Active</button>
+    </div>
+    <div id="pre-processing"></div>
+    <script src="../assets/effects/constructor/Effects.js"></script>
+    <script src="../js/modules/engines/RenderingEngine.js"></script>
+    <script src="../assets/ui/healthbar/constructor/Healthbar.js"></script>
+    <script src="../assets/characters/Yasuo/constructor/Yasuo.js"></script>
+    <script src="../assets/map/platform/constructor/Platform.js"></script>
+    <script src="../assets/map/nexus/constructor/Nexus.js"></script>
+    <script src="../assets/map/turret/constructor/Turret.js"></script>
+    <script src="../js/modules/controllers/Keyboard.js"></script>
+    <script src="../js/modules/controllers/Touchscreen.js"></script>
+    <script>
+        function lerp(v0, v1, t) {
+            return v0*(1-t)+v1*t
+        }
+        const Renderer = new RenderingEngine(30)
+        class Viewport {
+            constructor(canvas) {
+                this.pos = {
+                    x: 0,
+                    y: 0,
+                }
+                this.canvas = canvas;
+                this.follow = (object) => {
+                    this.pos.x = lerp(this.pos.x,-object.pos.x+canvas.width/2,0.2)
+                }
+            }
+        }
+        class Game {
+            constructor(data) {
+                this.data = data;
+                this.soundtrack = new Audio('../assets/soundtrack/rift.mp3')
+                this.playSound = {
+                    soundtrack: () => {
+                        this.soundtrack.volume = 0.5;
+                        this.soundtrack.loop = true;
+                        this.soundtrack.play()
+                    }
+                }
+            }   
+        }
+        class Canvas {
+                constructor(container){
+                    this.scene = []
+                    this.viewport = null;
+                    this.id = `canvas-${Math.random()}`
+                    this.width = 1920;
+                    this.height = 1100;
+                    this.container = container
+                    document.getElementById(container.id).innerHTML += `<canvas id="${this.id}" style="width: 100%; height: 100%;"></canvas>`
+                    this.element = document.getElementById(this.id)
+                    this.context = this.element.getContext('2d');
+                    this.element.width = 1920;
+                    this.element.height = 1100;
+                    this.element.style.width = '100%';
+                    this.element.style.height = '100%';
+                    this.element.style.backgroundImage = "url('../assets/rift.jpg')";
+                    this.element.style.backgroundSize = "cover"
+                    this.element.style.backgroundRepeat = "no-repeat"
+
+                }
+                add(item) {
+                    this.scene.push(item)
+                    item.canvas = this
+                }
+                remove(item) {
+                   var objectToRemove = this.scene.find(object => object.uuid === item.uuid);
+                   if (objectToRemove !== undefined) {
+                    this.scene.splice(this.scene.indexOf(objectToRemove),1)
+                   }
+
+                }
+                clear() {
+                    this.context.clearRect(0,0,this.width,this.height)
+                }
+                render() {
+                    this.scene.forEach(item => {
+                        item.render(this.viewport.pos)
+                    })
+                }
+                selfDestruct() {
+                    this.container.removeChild(this.element)
+                    for (const property in this) {
+                        eval(`delete this.${property}`)
+                    }
+                }
+            }
+            const container = document.getElementById('container')
+            const ui = document.getElementById('ui-layer')
+            var canvas,viewport,keyboard,touchscreen,player,platform,nexus,turretL,turretR
+            var game = new Game(1)
+            function load() {
+                canvas = new Canvas(container);
+                viewport = new Viewport(canvas)
+                canvas.viewport = viewport;
+                keyboard = new Keyboard()
+                touchscreen = new Touchscreen(ui)
+                touchscreen.connect()
+                player = new Yasuo(touchscreen)
+                platform = new Platform({x: -2250,y: 800})
+                nexus = new Nexus({x: 0,y: 700})
+                turretL = new Turret({x: -700,y: 650},true)
+                turretR = new Turret({x: 700,y: 650},false)
+                canvas.add(platform)
+                canvas.add(nexus)
+                canvas.add(turretL)
+                canvas.add(turretR)
+                canvas.add(player)
+                keyboard.connect()
+                Renderer.startAnimating()
+            }
+            load()
+            function unload() {
+                Renderer.stopAnimating()
+                canvas.selfDestruct()
+                canvas = null;
+                viewport = null;
+                platform = null;
+                player.selfDestruct()
+                player = null;         
+                keyboard = null;
+                touchscreen.selfDestruct()
+                touchscreen = null;
+            }   
+            keyboard.logParam = function() {game.playSound.soundtrack()}
+            keyboard.logParam2 = function() {} 
+        Renderer.render = function() {
+            game.playSound.soundtrack()
+            touchscreen.update()
+            viewport.follow(player)
+            canvas.clear()
+            canvas.render()
+        }
+        
+    </script>
+</body>
+</html>
